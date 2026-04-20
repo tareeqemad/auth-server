@@ -15,7 +15,7 @@ class IdTokenService
         private readonly ClaimsService $claims,
     ) {}
 
-    public function issue(User $user, string $clientId, array $scopes, ?string $nonce = null): string
+    public function issue(User $user, string $clientId, array $scopes, ?string $nonce = null, ?string $sid = null): string
     {
         $config = Configuration::forAsymmetricSigner(
             new Sha256(),
@@ -36,6 +36,10 @@ class IdTokenService
 
         if ($nonce !== null && $nonce !== '') {
             $builder = $builder->withClaim('nonce', $nonce);
+        }
+
+        if ($sid !== null && $sid !== '') {
+            $builder = $builder->withClaim('sid', $sid);
         }
 
         $authTime = $user->last_login_at?->timestamp ?? $now->getTimestamp();

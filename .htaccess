@@ -1,0 +1,2 @@
+# Deny direct access to this folder (not the document root in production)
+Require all denied

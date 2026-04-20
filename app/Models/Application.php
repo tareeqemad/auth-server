@@ -25,6 +25,8 @@ class Application extends Client
         'launch_url',
         'logo_url',
         'is_first_party',
+        'back_channel_logout_uri',
+        'back_channel_logout_session_required',
     ];
 
     protected $hidden = [
@@ -38,6 +40,7 @@ class Application extends Client
             'grant_types' => 'array',
             'revoked' => 'boolean',
             'is_first_party' => 'boolean',
+            'back_channel_logout_session_required' => 'boolean',
         ];
     }
 
@@ -71,5 +74,10 @@ class Application extends Client
         $uris = $this->redirect_uris ?? [];
 
         return is_array($uris) && count($uris) > 0 ? $uris[0] : null;
+    }
+
+    public function supportsBackChannelLogout(): bool
+    {
+        return ! empty($this->back_channel_logout_uri);
     }
 }

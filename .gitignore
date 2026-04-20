@@ -22,3 +22,15 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Sensitive data
+/auth_server_dump.sql
+/database/seeders/data/hr_employees.csv
+/database/seeders/data/
+*.xlsx
+*.csv
+!composer.json
+!package.json
+
+# Local Claude settings
+/.claude/settings.local.json

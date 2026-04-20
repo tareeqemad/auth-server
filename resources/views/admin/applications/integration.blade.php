@@ -431,6 +431,98 @@ SSO_CLIENT_SECRET=your-secret-here</pre></div>
     <div class="card-glass rounded-2xl p-6 mb-6">
         <h2 class="font-bold text-slate-900 mb-4 flex items-center gap-2">
             <span class="step-num">4</span>
+            <span>Single Logout (SLO) — Back-channel</span>
+        </h2>
+
+        <p class="text-sm text-slate-600 mb-4">
+            لما المستخدم يعمل logout من الـ IdP (أو من أي نظام عميل يستخدم <code>end_session_endpoint</code>)،
+            بنبعتلكم POST request فيه <code>logout_token</code> (JWT موقّع بـ RS256).
+            نظامكم لازم يتحقق من التوقيع ويحذف الـ session المحلية للمستخدم.
+        </p>
+
+        <div class="grid md:grid-cols-2 gap-4 mb-4">
+            <div class="doc-card">
+                <div class="doc-label">End Session Endpoint (RP-initiated)</div>
+                <div class="doc-value">
+                    <div class="doc-input" dir="ltr">{{ $issuer }}/oauth/logout</div>
+                    <button class="copy-btn" data-copy="{{ $issuer }}/oauth/logout">نسخ</button>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-2">
+                    وجّه المستخدم لهنا مع <code>id_token_hint</code> و <code>post_logout_redirect_uri</code>
+                </p>
+            </div>
+            <div class="doc-card">
+                <div class="doc-label">Back-Channel Logout URI (عندكم)</div>
+                <div class="doc-value">
+                    <div class="doc-input" dir="ltr">{{ $application->back_channel_logout_uri ?: '— لم يُكوَّن بعد —' }}</div>
+                    @if ($application->back_channel_logout_uri)
+                        <button class="copy-btn" data-copy="{{ $application->back_channel_logout_uri }}">نسخ</button>
+                    @endif
+                </div>
+                <p class="text-[11px] text-slate-500 mt-2">
+                    يُعدَّل من صفحة <a href="{{ route('admin.applications.edit', $application) }}" class="text-blue-600 underline">تعديل التطبيق</a>
+                </p>
+            </div>
+        </div>
+
+        <p class="text-xs font-semibold text-slate-700 mb-2">logout_token مثال (JWT payload):</p>
+        <div class="code-block mb-4"><button class="copy-code" onclick="copyCode(this)">نسخ</button><pre>{
+  <span class="code-string">"iss"</span>: <span class="code-string">"{{ $issuer }}"</span>,
+  <span class="code-string">"sub"</span>: <span class="code-string">"user-uuid"</span>,
+  <span class="code-string">"aud"</span>: <span class="code-string">"{{ $application->id }}"</span>,
+  <span class="code-string">"iat"</span>: 1234567890,
+  <span class="code-string">"exp"</span>: 1234568010,
+  <span class="code-string">"jti"</span>: <span class="code-string">"unique-token-id"</span>,
+  <span class="code-string">"sid"</span>: <span class="code-string">"session-id-from-id_token"</span>,
+  <span class="code-string">"events"</span>: {
+    <span class="code-string">"http://schemas.openid.net/event/backchannel-logout"</span>: {}
+  }
+}</pre></div>
+
+        <p class="text-xs font-semibold text-slate-700 mb-2">Laravel — نقطة نهاية الاستقبال:</p>
+        <div class="code-block mb-4"><button class="copy-code" onclick="copyCode(this)">نسخ</button><pre><span class="code-comment">// routes/web.php — بدون CSRF</span>
+Route::post(<span class="code-string">'/sso/back-channel-logout'</span>, [SsoController::<span class="code-keyword">class</span>, <span class="code-string">'backChannelLogout'</span>])
+    -&gt;withoutMiddleware([VerifyCsrfToken::<span class="code-keyword">class</span>]);
+
+<span class="code-comment">// SsoController.php</span>
+<span class="code-keyword">use</span> Firebase\JWT\JWT;
+<span class="code-keyword">use</span> Firebase\JWT\JWK;
+
+<span class="code-keyword">public function</span> backChannelLogout(Request $request) {
+    $logoutToken = $request-&gt;input(<span class="code-string">'logout_token'</span>);
+    <span class="code-keyword">if</span> (!$logoutToken) <span class="code-keyword">return</span> response()-&gt;json([<span class="code-string">'error'</span> =&gt; <span class="code-string">'missing_token'</span>], 400);
+
+    <span class="code-comment">// 1. حمّل الـ JWKS (cache ل 12 ساعة)</span>
+    $jwks = Http::get(<span class="code-string">'{{ $endpoints['jwks'] }}'</span>)-&gt;json();
+
+    <span class="code-keyword">try</span> {
+        $claims = JWT::decode($logoutToken, JWK::parseKeySet($jwks));
+    } <span class="code-keyword">catch</span> (Throwable $e) {
+        <span class="code-keyword">return</span> response()-&gt;json([<span class="code-string">'error'</span> =&gt; <span class="code-string">'invalid_token'</span>], 400);
+    }
+
+    <span class="code-comment">// 2. تحقق iss + aud + events</span>
+    <span class="code-keyword">if</span> ($claims-&gt;iss !== <span class="code-string">'{{ $issuer }}'</span>) <span class="code-keyword">return</span> response(<span class="code-string">''</span>, 400);
+    <span class="code-keyword">if</span> ($claims-&gt;aud !== <span class="code-string">'{{ $application->id }}'</span>) <span class="code-keyword">return</span> response(<span class="code-string">''</span>, 400);
+    <span class="code-keyword">if</span> (!isset($claims-&gt;events-&gt;{<span class="code-string">'http://schemas.openid.net/event/backchannel-logout'</span>})) <span class="code-keyword">return</span> response(<span class="code-string">''</span>, 400);
+
+    <span class="code-comment">// 3. امسح session المستخدم (sub = user uuid أو sid = session id)</span>
+    DB::table(<span class="code-string">'sessions'</span>)-&gt;where(<span class="code-string">'user_id'</span>, $claims-&gt;sub)-&gt;delete();
+
+    <span class="code-keyword">return</span> response()-&gt;json([<span class="code-string">'ok'</span> =&gt; <span class="code-keyword">true</span>]);
+}</pre></div>
+
+        <div class="p-3 rounded-lg text-xs" style="background:#fffbeb;border:1px solid #fde68a;color:#92400e">
+            <strong>⚠️ ملاحظة:</strong>
+            الـ endpoint لازم يكون <code>POST</code> و بدون CSRF protection (الطلب جاي من server-to-server).
+            تجاوب بـ <code>200 OK</code> لما تنجح، أو <code>400</code> لو الـ token غير صالح.
+            Timeout عندنا 5 ثواني — خلي الـ endpoint سريع.
+        </div>
+    </div>
+
+    <div class="card-glass rounded-2xl p-6 mb-6">
+        <h2 class="font-bold text-slate-900 mb-4 flex items-center gap-2">
+            <span class="step-num">5</span>
             <span>قائمة الاختبار (Checklist)</span>
         </h2>
         <div class="space-y-2">
@@ -443,6 +535,8 @@ SSO_CLIENT_SECRET=your-secret-here</pre></div>
                 'ربط المستخدم بجدول users الحالي عبر email',
                 'زر logout ينظّف الـ session المحلية',
                 'اختبار مع مستخدم موجود + مستخدم جديد',
+                'Back-channel logout URI مُكوَّن ومُختبَر (يستقبل JWT ويحذف session)',
+                'التحقق من توقيع logout_token عبر JWKS',
             ] as $item)
                 <label class="flex items-start gap-2.5 cursor-pointer p-3 rounded-lg hover:bg-slate-50 transition">
                     <input type="checkbox" class="mt-0.5 w-4 h-4 rounded" style="accent-color: var(--accent-color)">

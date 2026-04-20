@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SsoSession extends Model
 {
@@ -39,6 +40,11 @@ class SsoSession extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function clients(): HasMany
+    {
+        return $this->hasMany(SsoSessionClient::class, 'sso_session_id');
     }
 
     public function isActive(): bool

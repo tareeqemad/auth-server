@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\SsoSession;
+use App\Services\PasswordHistoryService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -83,9 +84,30 @@ class ProfileController extends Controller
             ]);
         }
 
+        $history = app(PasswordHistoryService::class);
+
+        if ($history->matchesRecent($user, $data['password'])) {
+            AuditLog::create([
+                'user_id' => $user->id,
+                'event_type' => AuditLog::EVENT_PASSWORD_REUSE_BLOCKED,
+                'email' => $user->email,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'metadata' => ['source' => 'self_service'],
+            ]);
+
+            throw ValidationException::withMessages([
+                'password' => 'لا يمكن استخدام إحدى آخر '.PasswordHistoryService::HISTORY_SIZE.' كلمات مرور سابقة.',
+            ]);
+        }
+
+        $previousHash = $user->password;
+
         $user->update([
             'password' => Hash::make($data['password']),
         ]);
+
+        $history->record($user, $previousHash);
 
         AuditLog::create([
             'user_id' => $user->id,

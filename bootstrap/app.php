@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureIsAdmin;
+use App\Http\Middleware\ForceHttpsInProduction;
 use App\Http\Middleware\IssueIdToken;
 use App\Http\Middleware\RequirePkce;
 use Illuminate\Foundation\Application;
@@ -14,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->prepend(ForceHttpsInProduction::class);
         $middleware->append(RequirePkce::class);
         $middleware->append(IssueIdToken::class);
 

@@ -448,11 +448,30 @@
             </div>
 
             <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                <button class="icon-btn has-badge" title="الإشعارات">
-                    <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                    </svg>
-                </button>
+                <div class="notif-wrap" style="position:relative">
+                    <button type="button" id="notif-bell" class="icon-btn" title="الإشعارات" style="position:relative">
+                        <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                        </svg>
+                        <span id="notif-badge"
+                              class="hidden"
+                              style="position:absolute;top:2px;left:2px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#ef4444;color:white;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid white"></span>
+                    </button>
+
+                    <div id="notif-panel"
+                         style="display:none;position:absolute;top:calc(100% + 8px);left:0;width:380px;max-height:500px;background:white;border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.2);border:1px solid #e2e8f0;z-index:1000;overflow:hidden">
+                        <div style="padding:.9rem 1rem;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between">
+                            <strong style="font-size:13px;color:#0f172a">الإشعارات</strong>
+                            <button type="button" id="notif-mark-read" style="font-size:11px;color:#64748b;background:none;border:none;cursor:pointer">تعليم الكل كمقروء</button>
+                        </div>
+                        <div id="notif-list" style="max-height:420px;overflow-y:auto">
+                            <div style="padding:2rem 1rem;text-align:center;color:#94a3b8;font-size:12px">جاري التحميل...</div>
+                        </div>
+                        <div style="padding:.65rem;border-top:1px solid #e2e8f0;text-align:center">
+                            <a href="{{ route('admin.audit_logs.index') }}" style="font-size:12px;color:#b45309;font-weight:600">عرض كل السجلات ›</a>
+                        </div>
+                    </div>
+                </div>
 
                 <a href="{{ route('dashboard') }}" class="icon-btn" title="حسابي الشخصي">
                     <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -566,6 +585,99 @@
             $(window).on('resize', function () {
                 if (isDesktop() && $sidebar.hasClass('open')) closeMobileSidebar();
             });
+
+            // ═════════════════════ Notifications ═════════════════════
+            var $notifBell = $('#notif-bell');
+            var $notifPanel = $('#notif-panel');
+            var $notifBadge = $('#notif-badge');
+            var $notifList = $('#notif-list');
+
+            function renderNotifItem(item) {
+                var colors = {
+                    rose:    {bg:'#fef2f2', fg:'#be123c'},
+                    amber:   {bg:'#fffbeb', fg:'#b45309'},
+                    emerald: {bg:'#ecfdf5', fg:'#047857'},
+                    blue:    {bg:'#eff6ff', fg:'#1d4ed8'},
+                    slate:   {bg:'#f8fafc', fg:'#475569'}
+                };
+                var c = colors[item.color] || colors.slate;
+                var newDot = item.is_new
+                    ? '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#F97316;margin-left:4px"></span>'
+                    : '';
+
+                return '<div style="padding:.75rem 1rem;border-bottom:1px solid #f1f5f9;display:flex;gap:.75rem;align-items:start;transition:background .15s;cursor:pointer" onmouseover="this.style.background=\'#fafbfc\'" onmouseout="this.style.background=\'transparent\'">' +
+                    '<div style="width:36px;height:36px;border-radius:10px;background:' + c.bg + ';color:' + c.fg + ';display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">' + item.icon + '</div>' +
+                    '<div style="flex:1;min-width:0">' +
+                        '<div style="font-size:12px;font-weight:600;color:#0f172a;margin-bottom:2px">' + item.label + newDot + '</div>' +
+                        '<div style="font-size:11px;color:#64748b;truncate">' + (item.user_name || '—') + (item.ip_address ? ' · <span dir="ltr" style="font-family:monospace">' + item.ip_address + '</span>' : '') + '</div>' +
+                        '<div style="font-size:10px;color:#94a3b8;margin-top:2px">' + item.created_at_human + '</div>' +
+                    '</div>' +
+                '</div>';
+            }
+
+            function loadNotifications() {
+                $.ajax({
+                    url: '{{ route('admin.notifications.index') }}',
+                    dataType: 'json'
+                })
+                    .done(function (res) {
+                        if (!res.success) return;
+
+                        if (res.unread > 0) {
+                            $notifBadge.text(res.unread > 99 ? '99+' : res.unread).css('display', 'flex');
+                        } else {
+                            $notifBadge.hide();
+                        }
+
+                        if (res.items.length === 0) {
+                            $notifList.html('<div style="padding:2rem 1rem;text-align:center;color:#94a3b8;font-size:12px">🔔 لا توجد إشعارات جديدة</div>');
+                            return;
+                        }
+
+                        var html = '';
+                        res.items.forEach(function (item) { html += renderNotifItem(item); });
+                        $notifList.html(html);
+                    })
+                    .fail(function () {
+                        $notifList.html('<div style="padding:2rem 1rem;text-align:center;color:#ef4444;font-size:12px">فشل تحميل الإشعارات</div>');
+                    });
+            }
+
+            function markNotifsRead() {
+                $.ajax({
+                    url: '{{ route('admin.notifications.mark_read') }}',
+                    type: 'POST',
+                    dataType: 'json'
+                }).done(function () {
+                    $notifBadge.hide();
+                    loadNotifications();
+                });
+            }
+
+            $notifBell.on('click', function (e) {
+                e.stopPropagation();
+                var isVisible = $notifPanel.is(':visible');
+                $notifPanel.toggle();
+                if (!isVisible) {
+                    loadNotifications();
+                    setTimeout(markNotifsRead, 1500);
+                }
+            });
+
+            $(document).on('click', function (e) {
+                if (!$(e.target).closest('.notif-wrap').length) {
+                    $notifPanel.hide();
+                }
+            });
+
+            $('#notif-mark-read').on('click', function (e) {
+                e.stopPropagation();
+                markNotifsRead();
+            });
+
+            // Initial load + poll every 60s
+            loadNotifications();
+            setInterval(loadNotifications, 60000);
         });
     </script>
 </body>

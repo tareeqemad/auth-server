@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\SmsOtp;
 use App\Models\User;
 use App\Services\HotsmsService;
+use App\Services\PasswordHistoryService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -199,7 +200,29 @@ class SmsPasswordResetController extends Controller
             return response()->json(['success' => false, 'message' => 'المستخدم غير موجود.'], 422);
         }
 
+        $history = app(PasswordHistoryService::class);
+
+        if ($history->matchesRecent($user, $data['password'])) {
+            AuditLog::create([
+                'user_id' => $user->id,
+                'event_type' => AuditLog::EVENT_PASSWORD_REUSE_BLOCKED,
+                'email' => $user->email,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'metadata' => ['source' => 'sms_reset'],
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'لا يمكن استخدام إحدى آخر '.PasswordHistoryService::HISTORY_SIZE.' كلمات مرور سابقة.',
+                'errors' => ['password' => ['لا يمكن استخدام إحدى آخر '.PasswordHistoryService::HISTORY_SIZE.' كلمات مرور سابقة.']],
+            ], 422);
+        }
+
+        $previousHash = $user->password;
+
         $user->update(['password' => Hash::make($data['password'])]);
+        $history->record($user, $previousHash);
         $otp->update(['used_at' => now()]);
         $request->session()->forget('sms_reset_token');
 

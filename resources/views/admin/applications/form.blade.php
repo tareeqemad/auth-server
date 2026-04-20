@@ -188,6 +188,21 @@
                     <p class="mt-1 text-[11px] text-slate-500">الرابط الذي يفتحه المستخدم من لوحته</p>
                 </div>
 
+                <div class="mb-4">
+                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                        رابط Back-channel Logout
+                        <span class="text-slate-400 font-normal">(اختياري — لتسجيل الخروج الموحّد)</span>
+                    </label>
+                    <input name="back_channel_logout_uri" value="{{ old('back_channel_logout_uri', $application->back_channel_logout_uri) }}"
+                           type="url" dir="ltr"
+                           class="input-glass w-full px-3 py-2 rounded-lg text-xs"
+                           placeholder="https://app.example.com/sso/back-channel-logout">
+                    <p class="mt-1 text-[11px] text-slate-500">
+                        عند logout من IdP سيتم إرسال <code>logout_token</code> (JWT موقّع RS256) POST على هذا الرابط.
+                        اتركه فارغاً للتعطيل.
+                    </p>
+                </div>
+
                 <label class="flex items-start gap-3 p-3 rounded-xl cursor-pointer hover:bg-slate-50 transition"
                        style="border: 1px solid #e2e8f0;">
                     <input type="checkbox" name="is_first_party" value="1"

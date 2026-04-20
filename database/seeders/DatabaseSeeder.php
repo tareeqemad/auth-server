@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -12,14 +11,21 @@ class DatabaseSeeder extends Seeder
 
     /**
      * Seed the application's database.
+     *
+     * Default seed order (production-safe):
+     * 1. SettingsSeeder     — brand + SMS + security settings
+     * 2. RolesSeeder        — 4 roles + 20 permissions
+     * 3. HrEmployeesSeeder  — 803 موظفين من CSV
+     *
+     * TestUsersSeeder is NOT included — it's for dev-only and must be invoked
+     * explicitly: `php artisan db:seed --class=TestUsersSeeder`
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'full_name' => 'Test User',
-            'email' => 'test@example.com',
+        $this->call([
+            SettingsSeeder::class,
+            RolesSeeder::class,
+            HrEmployeesSeeder::class,
         ]);
     }
 }

@@ -31,9 +31,15 @@ class DiscoveryController extends Controller
             'subject_types_supported' => ['public'],
             'id_token_signing_alg_values_supported' => ['RS256'],
             'token_endpoint_auth_methods_supported' => ['client_secret_basic', 'client_secret_post'],
-            'claims_supported' => config('oidc.claims_supported'),
+            'claims_supported' => array_values(array_unique(array_merge(
+                (array) config('oidc.claims_supported', []),
+                ['sid'],
+            ))),
             'code_challenge_methods_supported' => ['S256', 'plain'],
             'claim_types_supported' => ['normal'],
+            'backchannel_logout_supported' => true,
+            'backchannel_logout_session_supported' => true,
+            'frontchannel_logout_supported' => false,
         ]);
     }
 }

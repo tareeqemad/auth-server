@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\SsoSession;
 use App\Models\User;
+use App\Services\AccountLockoutService;
 use App\Services\HotsmsService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -20,7 +21,7 @@ class LoginController extends Controller
         return view('auth.login');
     }
 
-    public function authenticate(Request $request): RedirectResponse|JsonResponse
+    public function authenticate(Request $request, AccountLockoutService $lockout): RedirectResponse|JsonResponse
     {
         $credentials = $request->validate([
             'email' => ['required', 'string', 'email'],
@@ -29,14 +30,50 @@ class LoginController extends Controller
 
         $remember = $request->boolean('remember');
 
-        if (! Auth::attempt($credentials, $remember)) {
+        $existingUser = User::where('email', $credentials['email'])->first();
+
+        if ($existingUser && $lockout->isLocked($existingUser)) {
             AuditLog::create([
+                'user_id' => $existingUser->id,
+                'event_type' => AuditLog::EVENT_LOGIN_FAILED,
+                'email' => $existingUser->email,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'metadata' => [
+                    'reason' => 'account_locked',
+                    'locked_by_admin' => $existingUser->locked_by_admin_id !== null,
+                ],
+            ]);
+
+            return $this->failure(
+                $request,
+                ['email' => $this->lockedMessage($existingUser, $lockout)],
+            );
+        }
+
+        if (! Auth::attempt($credentials, $remember)) {
+            if ($existingUser) {
+                $lockout->recordFailedAttempt($existingUser, $request);
+            }
+
+            AuditLog::create([
+                'user_id' => $existingUser?->id,
                 'event_type' => AuditLog::EVENT_LOGIN_FAILED,
                 'email' => $credentials['email'],
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
-                'metadata' => ['reason' => 'invalid_credentials'],
+                'metadata' => [
+                    'reason' => 'invalid_credentials',
+                    'attempts' => $existingUser?->failed_login_attempts,
+                ],
             ]);
+
+            if ($existingUser && $lockout->isLocked($existingUser->refresh())) {
+                return $this->failure(
+                    $request,
+                    ['email' => $this->lockedMessage($existingUser, $lockout)],
+                );
+            }
 
             return $this->failure(
                 $request,
@@ -94,6 +131,8 @@ class LoginController extends Controller
             return redirect($redirect);
         }
 
+        $lockout->recordSuccessfulLogin($user);
+
         $request->session()->regenerate();
 
         $ssoSession = SsoSession::create([
@@ -124,7 +163,8 @@ class LoginController extends Controller
             ],
         ]);
 
-        $target = redirect()->intended(route('dashboard'))->getTargetUrl();
+        $defaultRoute = $user->isAdmin() ? route('admin.dashboard') : route('dashboard');
+        $target = redirect()->intended($defaultRoute)->getTargetUrl();
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -147,5 +187,20 @@ class LoginController extends Controller
         }
 
         return back()->withErrors($errors)->onlyInput('email');
+    }
+
+    private function lockedMessage(User $user, AccountLockoutService $lockout): string
+    {
+        if ($user->locked_by_admin_id !== null) {
+            return 'تم حظر حسابك من قبل المشرف. الرجاء التواصل مع الإدارة.';
+        }
+
+        $seconds = $lockout->secondsRemaining($user);
+        $minutes = (int) ceil($seconds / 60);
+
+        return sprintf(
+            'تم إيقاف حسابك مؤقتاً بعد عدة محاولات فاشلة. حاول مجدداً بعد %d دقيقة.',
+            max(1, $minutes),
+        );
     }
 }

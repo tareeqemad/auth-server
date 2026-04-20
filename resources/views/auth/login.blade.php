@@ -53,7 +53,7 @@
         <div>
             <label class="flex items-center justify-between text-[12px] font-semibold text-white/60 mb-1.5 tracking-wide">
                 <span>كلمة المرور</span>
-                <a href="{{ route('password.request') }}" class="text-[11px] font-medium text-amber-400/70 hover:text-amber-400 transition">
+                <a href="{{ route('password.sms.phone') }}" class="text-[11px] font-medium text-amber-400/70 hover:text-amber-400 transition">
                     نسيت كلمة المرور؟
                 </a>
             </label>

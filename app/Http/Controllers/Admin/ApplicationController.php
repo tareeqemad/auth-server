@@ -73,6 +73,7 @@ class ApplicationController extends Controller
             'launch_url' => $data['launch_url'] ?? null,
             'logo_url' => $data['logo_url'] ?? null,
             'is_first_party' => $data['is_first_party'] ?? true,
+            'back_channel_logout_uri' => $data['back_channel_logout_uri'] ?? null,
             'redirect_uris' => $data['redirect_uris'],
             'grant_types' => $data['grant_types'],
             'secret' => Hash::make($plainSecret),
@@ -143,6 +144,7 @@ class ApplicationController extends Controller
             'launch_url' => $data['launch_url'] ?? null,
             'logo_url' => $data['logo_url'] ?? null,
             'is_first_party' => $data['is_first_party'] ?? false,
+            'back_channel_logout_uri' => $data['back_channel_logout_uri'] ?? null,
             'redirect_uris' => $data['redirect_uris'],
             'grant_types' => $data['grant_types'],
         ]);
@@ -216,6 +218,7 @@ class ApplicationController extends Controller
             'launch_url' => ['nullable', 'url', 'max:500'],
             'logo_url' => ['nullable', 'url', 'max:500'],
             'is_first_party' => ['nullable', 'boolean'],
+            'back_channel_logout_uri' => ['nullable', 'url', 'max:500'],
             'redirect_uris' => ['required', 'array', 'min:1'],
             'redirect_uris.*' => ['required', 'url', 'max:500'],
             'grant_types' => ['required', 'array', 'min:1'],

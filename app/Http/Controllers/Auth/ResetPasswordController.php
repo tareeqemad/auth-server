@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Services\PasswordHistoryService;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -30,13 +31,35 @@ class ResetPasswordController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
+        $history = app(PasswordHistoryService::class);
+        $candidate = User::where('email', $data['email'])->first();
+
+        if ($candidate && $history->matchesRecent($candidate, $data['password'])) {
+            AuditLog::create([
+                'user_id' => $candidate->id,
+                'event_type' => AuditLog::EVENT_PASSWORD_REUSE_BLOCKED,
+                'email' => $candidate->email,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'metadata' => ['source' => 'email_reset'],
+            ]);
+
+            return back()->withErrors([
+                'password' => 'لا يمكن استخدام إحدى آخر '.PasswordHistoryService::HISTORY_SIZE.' كلمات مرور سابقة.',
+            ]);
+        }
+
         $status = Password::reset(
             $data,
-            function (User $user, string $password) {
+            function (User $user, string $password) use ($history) {
+                $previousHash = $user->password;
+
                 $user->forceFill([
                     'password' => $password,
                     'remember_token' => Str::random(60),
                 ])->save();
+
+                $history->record($user, $previousHash);
 
                 event(new PasswordReset($user));
             },

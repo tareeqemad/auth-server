@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\SmsOtp;
 use App\Models\SsoSession;
 use App\Models\User;
+use App\Services\AccountLockoutService;
 use App\Services\HotsmsService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -67,6 +68,7 @@ class TwoFactorController extends Controller
         $otp->update(['used_at' => now()]);
 
         $user = User::findOrFail($pending['user_id']);
+        app(AccountLockoutService::class)->recordSuccessfulLogin($user);
         Auth::login($user, $pending['remember'] ?? false);
         $request->session()->regenerate();
         $request->session()->forget('2fa_pending');
@@ -99,10 +101,12 @@ class TwoFactorController extends Controller
             ],
         ]);
 
+        $defaultRoute = $user->isAdmin() ? route('admin.dashboard') : route('dashboard');
+
         return response()->json([
             'success' => true,
             'message' => 'تم تسجيل الدخول بنجاح.',
-            'redirect' => session()->pull('url.intended', route('dashboard')),
+            'redirect' => session()->pull('url.intended', $defaultRoute),
         ]);
     }
 

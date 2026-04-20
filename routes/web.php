@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\ApplicationController as AdminApplicationController;
 use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\NotificationController as AdminNotificationController;
 use App\Http\Controllers\Admin\SessionController as AdminSessionController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController as AdminUsersController;
@@ -16,35 +17,56 @@ use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\TwoFactorSettingsController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\OIDC\DiscoveryController;
+use App\Http\Controllers\OIDC\EndSessionController;
 use App\Http\Controllers\OIDC\JwksController;
 use App\Http\Controllers\OIDC\UserInfoController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return redirect()->route(Auth::check() ? 'dashboard' : 'login');
+    if (! Auth::check()) {
+        return redirect()->route('login');
+    }
+
+    return redirect()->route(Auth::user()->isAdmin() ? 'admin.dashboard' : 'dashboard');
 });
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'show'])->name('login');
-    Route::post('/login', [LoginController::class, 'authenticate'])->name('login.authenticate');
+    Route::post('/login', [LoginController::class, 'authenticate'])
+        ->middleware('throttle:10,1')
+        ->name('login.authenticate');
 
     Route::get('/forgot-password', [ForgotPasswordController::class, 'show'])->name('password.request');
-    Route::post('/forgot-password', [ForgotPasswordController::class, 'send'])->name('password.email');
+    Route::post('/forgot-password', [ForgotPasswordController::class, 'send'])
+        ->middleware('throttle:5,5')
+        ->name('password.email');
 
     Route::get('/reset-password/{token}', [ResetPasswordController::class, 'show'])->name('password.reset');
-    Route::post('/reset-password', [ResetPasswordController::class, 'update'])->name('password.update');
+    Route::post('/reset-password', [ResetPasswordController::class, 'update'])
+        ->middleware('throttle:5,5')
+        ->name('password.update');
 
     Route::get('/forgot-password/sms', [SmsPasswordResetController::class, 'showPhoneForm'])->name('password.sms.phone');
-    Route::post('/forgot-password/sms/send', [SmsPasswordResetController::class, 'sendCode'])->name('password.sms.send');
+    Route::post('/forgot-password/sms/send', [SmsPasswordResetController::class, 'sendCode'])
+        ->middleware('throttle:3,10')
+        ->name('password.sms.send');
     Route::get('/forgot-password/sms/verify', [SmsPasswordResetController::class, 'showVerifyForm'])->name('password.sms.verify.show');
-    Route::post('/forgot-password/sms/verify', [SmsPasswordResetController::class, 'verifyCode'])->name('password.sms.verify');
+    Route::post('/forgot-password/sms/verify', [SmsPasswordResetController::class, 'verifyCode'])
+        ->middleware('throttle:10,10')
+        ->name('password.sms.verify');
     Route::get('/forgot-password/sms/reset', [SmsPasswordResetController::class, 'showResetForm'])->name('password.sms.reset.show');
-    Route::post('/forgot-password/sms/reset', [SmsPasswordResetController::class, 'resetPassword'])->name('password.sms.reset');
+    Route::post('/forgot-password/sms/reset', [SmsPasswordResetController::class, 'resetPassword'])
+        ->middleware('throttle:5,10')
+        ->name('password.sms.reset');
 
     Route::get('/login/2fa', [TwoFactorController::class, 'show'])->name('login.2fa.show');
-    Route::post('/login/2fa', [TwoFactorController::class, 'verify'])->name('login.2fa.verify');
-    Route::post('/login/2fa/resend', [TwoFactorController::class, 'resend'])->name('login.2fa.resend');
+    Route::post('/login/2fa', [TwoFactorController::class, 'verify'])
+        ->middleware('throttle:10,10')
+        ->name('login.2fa.verify');
+    Route::post('/login/2fa/resend', [TwoFactorController::class, 'resend'])
+        ->middleware('throttle:3,10')
+        ->name('login.2fa.resend');
 });
 
 Route::middleware('auth')->group(function () {
@@ -68,6 +90,10 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/dashboard', function () {
         $user = Auth::user();
+
+        if ($user->isAdmin()) {
+            return redirect()->route('admin.dashboard');
+        }
 
         $applications = \App\Models\Application::query()
             ->whereNotNull('slug')
@@ -112,6 +138,9 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', AdminDashboardController::class)->name('dashboard');
 
+    Route::get('notifications', [AdminNotificationController::class, 'index'])->name('notifications.index');
+    Route::post('notifications/mark-read', [AdminNotificationController::class, 'markRead'])->name('notifications.mark_read');
+
     Route::post('applications/{application}/rotate-secret', [AdminApplicationController::class, 'rotateSecret'])->name('applications.rotate_secret');
     Route::post('applications/{application}/toggle-revoke', [AdminApplicationController::class, 'toggleRevoke'])->name('applications.toggle_revoke');
     Route::get('applications/{application}/integration', [AdminApplicationController::class, 'integration'])->name('applications.integration');
@@ -119,7 +148,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::post('users/{user}/toggle-active', [AdminUsersController::class, 'toggleActive'])->name('users.toggle_active');
     Route::post('users/{user}/reset-password', [AdminUsersController::class, 'resetPassword'])->name('users.reset_password');
-    Route::resource('users', AdminUsersController::class)->except(['show']);
+    Route::post('users/{user}/unlock', [AdminUsersController::class, 'unlock'])->name('users.unlock');
+    Route::post('users/{user}/lock', [AdminUsersController::class, 'lock'])->name('users.lock');
+    Route::resource('users', AdminUsersController::class);
 
     Route::get('audit-logs', [AuditLogController::class, 'index'])->name('audit_logs.index');
 
@@ -140,3 +171,5 @@ Route::get('/.well-known/openid-configuration', DiscoveryController::class);
 Route::get('/.well-known/jwks.json', JwksController::class);
 
 Route::middleware('auth:api')->match(['get', 'post'], '/oauth/userinfo', UserInfoController::class);
+
+Route::match(['get', 'post'], '/oauth/logout', EndSessionController::class)->name('oauth.end_session');

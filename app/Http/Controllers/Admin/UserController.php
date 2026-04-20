@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Services\AccountLockoutService;
+use App\Services\PasswordHistoryService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -15,7 +17,7 @@ use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): View|JsonResponse
     {
         $query = User::query()
             ->withCount('systemLinks')
@@ -25,7 +27,9 @@ class UserController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%");
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('national_id', 'like', "%{$search}%")
+                    ->orWhere('employee_number', $search);
             });
         }
 
@@ -33,18 +37,34 @@ class UserController extends Controller
             match ($status) {
                 'active' => $query->where('is_active', true),
                 'inactive' => $query->where('is_active', false),
+                'locked' => $query->whereNotNull('locked_until')->where('locked_until', '>', now()),
                 default => null,
             };
         }
 
+        $users = $query->paginate(200)->withQueryString();
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'html' => view('admin.users._rows', ['users' => $users])->render(),
+                'has_more' => $users->hasMorePages(),
+                'current_page' => $users->currentPage(),
+                'last_page' => $users->lastPage(),
+                'total' => $users->total(),
+                'loaded' => ($users->currentPage() - 1) * $users->perPage() + $users->count(),
+            ]);
+        }
+
         return view('admin.users.index', [
-            'users' => $query->paginate(15)->withQueryString(),
+            'users' => $users,
             'search' => $search,
             'status' => $status,
             'stats' => [
                 'total' => User::count(),
                 'active' => User::where('is_active', true)->count(),
                 'inactive' => User::where('is_active', false)->count(),
+                'locked' => User::whereNotNull('locked_until')->where('locked_until', '>', now())->count(),
             ],
         ]);
     }
@@ -89,6 +109,27 @@ class UserController extends Controller
         ]);
     }
 
+    public function show(User $user): View
+    {
+        $user->load(['systemLinks', 'roles']);
+
+        $recentAudit = \App\Models\AuditLog::where('user_id', $user->id)
+            ->latest('created_at')
+            ->limit(15)
+            ->get();
+
+        $sessionsActive = \App\Models\SsoSession::where('user_id', $user->id)
+            ->where('revoked', false)
+            ->where('expires_at', '>', now())
+            ->count();
+
+        return view('admin.users.show', [
+            'user' => $user,
+            'recentAudit' => $recentAudit,
+            'sessionsActive' => $sessionsActive,
+        ]);
+    }
+
     public function update(Request $request, User $user): JsonResponse|RedirectResponse
     {
         $data = $this->validateData($request, $user->id);
@@ -100,11 +141,17 @@ class UserController extends Controller
             'is_active' => (bool) ($data['is_active'] ?? false),
         ];
 
+        $previousHash = null;
         if (! empty($data['password'])) {
+            $previousHash = $user->password;
             $updates['password'] = Hash::make($data['password']);
         }
 
         $user->update($updates);
+
+        if ($previousHash !== null) {
+            app(PasswordHistoryService::class)->record($user, $previousHash);
+        }
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -148,11 +195,58 @@ class UserController extends Controller
         ]);
     }
 
+    public function unlock(Request $request, User $user, AccountLockoutService $lockout): JsonResponse
+    {
+        if (! $user->isLocked() && $user->failed_login_attempts === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'الحساب غير محظور أصلاً.',
+            ], 422);
+        }
+
+        $lockout->unlockByAdmin($user, $request->user(), $request);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم فك الحظر عن المستخدم.',
+        ]);
+    }
+
+    public function lock(Request $request, User $user, AccountLockoutService $lockout): JsonResponse
+    {
+        if ($user->id === auth()->id()) {
+            return response()->json(['success' => false, 'message' => 'لا يمكنك حظر حسابك.'], 422);
+        }
+
+        $data = $request->validate([
+            'minutes' => ['nullable', 'integer', 'min:1', 'max:525600'],
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $lockout->lockByAdmin(
+            $user,
+            $request->user(),
+            $data['minutes'] ?? null,
+            $data['reason'] ?? null,
+            $request,
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => $data['minutes']
+                ? "تم حظر المستخدم لمدة {$data['minutes']} دقيقة."
+                : 'تم حظر المستخدم بشكل دائم (حتى يتم فك الحظر يدوياً).',
+        ]);
+    }
+
     public function resetPassword(Request $request, User $user): JsonResponse
     {
         $newPassword = Str::password(14, letters: true, numbers: true, symbols: false);
+        $previousHash = $user->password;
         $user->password = Hash::make($newPassword);
         $user->save();
+
+        app(PasswordHistoryService::class)->record($user, $previousHash);
 
         AuditLog::create([
             'user_id' => $user->id,
