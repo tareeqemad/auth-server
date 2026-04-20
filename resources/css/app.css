@@ -1,0 +1,197 @@
+@import 'tailwindcss';
+
+/* Tajawal — local via @fontsource */
+@import '@fontsource/tajawal/400.css';
+@import '@fontsource/tajawal/500.css';
+@import '@fontsource/tajawal/700.css';
+@import '@fontsource/tajawal/800.css';
+
+/* Amiri — for the tagline */
+@import '@fontsource/amiri/700.css';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@theme {
+    --font-sans: 'Tajawal', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+/* ─── Custom Checkbox ──────────────────────────────── */
+.custom-check {
+    display: inline-flex;
+    align-items: center;
+    gap: .625rem;
+    cursor: pointer;
+    user-select: none;
+}
+.custom-check input[type="checkbox"] { position: absolute; opacity: 0; pointer-events: none; }
+.custom-check .check-box {
+    width: 22px; height: 22px;
+    border-radius: 7px;
+    border: 2px solid rgba(255,255,255,.2);
+    background: rgba(255,255,255,.03);
+    display: flex; align-items: center; justify-content: center;
+    transition: all .2s cubic-bezier(.22,.61,.36,1);
+    position: relative;
+    flex-shrink: 0;
+}
+.custom-check:hover .check-box { border-color: rgba(255,255,255,.4); background: rgba(255,255,255,.06); }
+.custom-check input:focus-visible + .check-box { box-shadow: 0 0 0 3px rgba(249,115,22,.25); }
+.custom-check input:checked + .check-box {
+    background: linear-gradient(135deg, #F97316 0%, #FBBF24 100%);
+    border-color: #F97316;
+    box-shadow: 0 6px 14px -4px rgba(249,115,22,.45);
+}
+.custom-check input:checked + .check-box::after {
+    content: '';
+    position: absolute;
+    left: 6px; top: 3px;
+    width: 6px; height: 11px;
+    border: 2px solid white;
+    border-top: 0; border-left: 0;
+    transform: rotate(45deg);
+    animation: check-pop .25s cubic-bezier(.22,.61,.36,1);
+}
+.custom-check .label-text { font-size: 13px; color: rgba(255,255,255,.65); transition: color .15s; }
+.custom-check:hover .label-text { color: rgba(255,255,255,.85); }
+@keyframes check-pop {
+    from { transform: rotate(45deg) scale(0); opacity: 0; }
+    to { transform: rotate(45deg) scale(1); opacity: 1; }
+}
+
+/* ─── Button Ripple ────────────────────────────────── */
+.has-ripple { position: relative; overflow: hidden; }
+.ripple-wave {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255,255,255,.45);
+    transform: scale(0);
+    animation: ripple-expand .6s ease-out forwards;
+    pointer-events: none;
+}
+@keyframes ripple-expand {
+    to { transform: scale(3); opacity: 0; }
+}
+
+/* ─── Systems Showcase ─────────────────────────────── */
+.sys-preview {
+    width: 46px; height: 46px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--sys-color), color-mix(in srgb, var(--sys-color) 70%, black));
+    color: white; font-weight: 700; font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    opacity: .35;
+    transform: scale(.85);
+    transition: all .5s cubic-bezier(.22,.61,.36,1);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 4px 12px -4px rgba(0,0,0,.3);
+    padding: 0;
+}
+.sys-preview:hover:not(.active) {
+    opacity: .7;
+    transform: scale(.95);
+}
+.sys-preview.active {
+    opacity: 1;
+    transform: scale(1.15);
+    box-shadow:
+        0 10px 30px -5px var(--sys-color),
+        0 0 0 3px rgba(255,255,255,.08),
+        0 0 50px -5px var(--sys-color);
+}
+
+.sys-pag-dot {
+    width: 7px; height: 7px;
+    border-radius: 9999px;
+    background: rgba(255,255,255,.18);
+    border: none; padding: 0;
+    cursor: pointer;
+    transition: all .4s cubic-bezier(.22,.61,.36,1);
+}
+.sys-pag-dot:hover:not(.active) { background: rgba(255,255,255,.4); }
+.sys-pag-dot.active {
+    width: 24px;
+    background: #F97316;
+    box-shadow: 0 0 10px rgba(249,115,22,.6);
+}
+
+/* ─── Grid Pattern Overlay ─────────────────────────── */
+.bg-grid-overlay::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+        linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px);
+    background-size: 50px 50px;
+    -webkit-mask-image: radial-gradient(ellipse at center, black 35%, transparent 80%);
+    mask-image: radial-gradient(ellipse at center, black 35%, transparent 80%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* ─── Status Badge Pulse ───────────────────────────── */
+@keyframes badge-breathe {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(52,211,153,.2); }
+    50% { box-shadow: 0 0 0 8px rgba(52,211,153,0); }
+}
+.status-badge-pulse { animation: badge-breathe 2.5s ease-in-out infinite; }
+
+/* Toastr — Dark RTL */
+#toast-container.toast-top-left > div {
+    font-family: 'Tajawal', system-ui, sans-serif;
+    direction: rtl;
+    text-align: right;
+    padding-right: 50px;
+    padding-left: 15px;
+    background-position: 98% center;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 40px -10px rgba(0,0,0,.5) !important;
+    backdrop-filter: blur(8px);
+}
+#toast-container > .toast-success { background-color: rgba(5,150,105,.95) !important; border: 1px solid rgba(52,211,153,.3); }
+#toast-container > .toast-error   { background-color: rgba(220,38,38,.95) !important; border: 1px solid rgba(248,113,113,.3); }
+#toast-container > .toast-info    { background-color: rgba(2,132,199,.95) !important; border: 1px solid rgba(96,165,250,.3); }
+#toast-container > .toast-warning { background-color: rgba(217,119,6,.95) !important; border: 1px solid rgba(251,191,36,.3); }
+
+/* SweetAlert — Dark Glass */
+.swal2-popup {
+    font-family: 'Tajawal', system-ui, sans-serif !important;
+    direction: rtl !important;
+    background: linear-gradient(160deg, #12243f 0%, #081830 100%) !important;
+    border: 1px solid rgba(255,255,255,.08) !important;
+    border-radius: 20px !important;
+    color: white !important;
+    box-shadow: 0 25px 60px -15px rgba(0,0,0,.7) !important;
+}
+.swal2-title { color: white !important; font-weight: 700 !important; }
+.swal2-html-container { color: rgba(255,255,255,.75) !important; }
+.swal2-confirm {
+    background: linear-gradient(135deg, #F97316 0%, #FBBF24 100%) !important;
+    border-radius: 12px !important;
+    font-weight: 700 !important;
+    box-shadow: 0 10px 25px -8px rgba(249,115,22,.45) !important;
+}
+.swal2-cancel {
+    background: rgba(255,255,255,.08) !important;
+    border: 1px solid rgba(255,255,255,.15) !important;
+    border-radius: 12px !important;
+    color: white !important;
+}
+.swal2-icon.swal2-warning { border-color: #F97316 !important; color: #F97316 !important; }
+.swal2-icon.swal2-success { border-color: #10b981 !important; color: #10b981 !important; }
+.swal2-icon.swal2-success [class^="swal2-success-line"] { background-color: #10b981 !important; }
+.swal2-icon.swal2-success .swal2-success-ring { border-color: rgba(16,185,129,.3) !important; }
+.swal2-input, .swal2-textarea {
+    background: rgba(8,24,48,.6) !important;
+    border: 1.5px solid rgba(255,255,255,.1) !important;
+    color: white !important;
+    border-radius: 10px !important;
+}
+.swal2-input:focus, .swal2-textarea:focus {
+    border-color: #F97316 !important;
+    box-shadow: 0 0 0 3px rgba(249,115,22,.22) !important;
+}
