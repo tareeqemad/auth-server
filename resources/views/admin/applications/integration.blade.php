@@ -431,6 +431,75 @@ SSO_CLIENT_SECRET=your-secret-here</pre></div>
     <div class="card-glass rounded-2xl p-6 mb-6">
         <h2 class="font-bold text-slate-900 mb-4 flex items-center gap-2">
             <span class="step-num">4</span>
+            <span>ربط المستخدم عبر رقم الهوية (<code>national_id</code> ↔ <code>id_number</code>)</span>
+        </h2>
+
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4 text-sm text-blue-900 leading-relaxed">
+            <strong>المفتاح الأساسي للربط هو رقم الهوية</strong> — ليس البريد الإلكتروني.<br>
+            الـ IdP يُرسل رقم الهوية في <code>id_token</code> باسم <code>national_id</code>.
+            نظامك يحفظه في العمود <code>id_number</code> في جدول <code>users</code> المحلي.
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                <p class="text-[11px] font-semibold text-slate-500 uppercase mb-1">في IdP (هذا المشروع)</p>
+                <p class="font-mono text-sm text-slate-900">users.<strong>national_id</strong></p>
+                <p class="text-[11px] text-slate-500 mt-1">CHAR(9) unique nullable</p>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                <p class="text-[11px] font-semibold text-slate-500 uppercase mb-1">في نظامك المحلي</p>
+                <p class="font-mono text-sm text-slate-900">users.<strong>id_number</strong></p>
+                <p class="text-[11px] text-slate-500 mt-1">تأكد أن العمود موجود ومُفهرَس unique</p>
+            </div>
+        </div>
+
+        <p class="text-xs font-semibold text-slate-700 mb-2">Scope مطلوب:</p>
+        <div class="code-block mb-4"><button class="copy-code" onclick="copyCode(this)">نسخ</button><pre>scope=openid+profile+email+<span class="code-keyword">national_id</span></pre></div>
+
+        <p class="text-xs font-semibold text-slate-700 mb-2">شكل id_token بعد إضافة <code>national_id</code>:</p>
+        <div class="code-block mb-4"><button class="copy-code" onclick="copyCode(this)">نسخ</button><pre>{
+  <span class="code-string">"sub"</span>: <span class="code-string">"01234567-89ab-..."</span>,
+  <span class="code-string">"email"</span>: <span class="code-string">"user@example.com"</span>,
+  <span class="code-string">"name"</span>: <span class="code-string">"المستخدم"</span>,
+  <span class="code-string">"national_id"</span>: <span class="code-string">"400104865"</span>,
+  ...
+}</pre></div>
+
+        <p class="text-xs font-semibold text-slate-700 mb-2">منطق البحث في نظامك بعد callback:</p>
+        <div class="code-block mb-4"><button class="copy-code" onclick="copyCode(this)">نسخ</button><pre><span class="code-comment">// بعد verifying id_token</span>
+<span class="code-keyword">const</span> nationalId = idToken.<span class="code-fn">national_id</span>;
+<span class="code-keyword">const</span> user = <span class="code-keyword">await</span> db.<span class="code-fn">queryOne</span>(
+  <span class="code-string">"SELECT * FROM users WHERE id_number = ?"</span>,
+  nationalId
+);
+
+<span class="code-keyword">if</span> (!user) {
+  <span class="code-comment">// Option A: أنشئ user جديد بالبيانات من id_token</span>
+  <span class="code-comment">// Option B: ارفض الدخول + أرسل لصفحة "تواصل مع الإدارة"</span>
+}
+
+session.<span class="code-fn">login</span>(user.id);</pre></div>
+
+        <p class="text-xs font-semibold text-slate-700 mb-2">التحقق من صحة رقم الهوية (JS — Luhn-like checksum):</p>
+        <div class="code-block"><button class="copy-code" onclick="copyCode(this)">نسخ</button><pre><span class="code-keyword">function</span> <span class="code-fn">validatePalID</span>(id) {
+  id = <span class="code-fn">String</span>(id).<span class="code-fn">trim</span>();
+  <span class="code-keyword">if</span> (id.length !== <span class="code-fn">9</span> || <span class="code-fn">isNaN</span>(id)) <span class="code-keyword">return false</span>;
+  <span class="code-keyword">let</span> sum = <span class="code-fn">0</span>;
+  <span class="code-keyword">for</span> (<span class="code-keyword">let</span> i = <span class="code-fn">0</span>; i &lt; <span class="code-fn">9</span>; i++) {
+    <span class="code-keyword">let</span> step = <span class="code-fn">Number</span>(id[i]) * ((i % <span class="code-fn">2</span>) + <span class="code-fn">1</span>);
+    sum += (step &gt; <span class="code-fn">9</span>) ? (step - <span class="code-fn">9</span>) : step;
+  }
+  <span class="code-keyword">return</span> sum % <span class="code-fn">10</span> === <span class="code-fn">0</span>;
+}</pre></div>
+
+        <div class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900">
+            <strong>ملاحظة:</strong> إذا <code>national_id</code> غير موجود في <code>id_token</code>، يعني أن المستخدم لم يُسجّل رقم هويته في IdP. أرسله لـ <code>/profile</code> في IdP لإضافته قبل إعادة المحاولة.
+        </div>
+    </div>
+
+    <div class="card-glass rounded-2xl p-6 mb-6">
+        <h2 class="font-bold text-slate-900 mb-4 flex items-center gap-2">
+            <span class="step-num">5</span>
             <span>Single Logout (SLO) — Back-channel</span>
         </h2>
 
@@ -522,7 +591,7 @@ Route::post(<span class="code-string">'/sso/back-channel-logout'</span>, [SsoCon
 
     <div class="card-glass rounded-2xl p-6 mb-6">
         <h2 class="font-bold text-slate-900 mb-4 flex items-center gap-2">
-            <span class="step-num">5</span>
+            <span class="step-num">6</span>
             <span>قائمة الاختبار (Checklist)</span>
         </h2>
         <div class="space-y-2">
@@ -532,11 +601,13 @@ Route::post(<span class="code-string">'/sso/back-channel-logout'</span>, [SsoCon
                 'PKCE مُفعّل (code_challenge_method=S256)',
                 'state parameter يُتحقّق منه في الـ callback',
                 'id_token يُتحقّق من توقيعه عبر JWKS',
-                'ربط المستخدم بجدول users الحالي عبر email',
+                'scope يتضمّن national_id (للحصول على رقم الهوية)',
+                'الربط عبر id_number في جدول users المحلي (مفهرس unique)',
+                'fallback: لو national_id غير موجود في id_token → صفحة إرشاد',
                 'زر logout ينظّف الـ session المحلية',
-                'اختبار مع مستخدم موجود + مستخدم جديد',
                 'Back-channel logout URI مُكوَّن ومُختبَر (يستقبل JWT ويحذف session)',
                 'التحقق من توقيع logout_token عبر JWKS',
+                'اختبار مع مستخدم موجود + مستخدم جديد',
             ] as $item)
                 <label class="flex items-start gap-2.5 cursor-pointer p-3 rounded-lg hover:bg-slate-50 transition">
                     <input type="checkbox" class="mt-0.5 w-4 h-4 rounded" style="accent-color: var(--accent-color)">

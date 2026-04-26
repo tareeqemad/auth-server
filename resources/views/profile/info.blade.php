@@ -37,6 +37,24 @@
                     <input name="phone" dir="ltr" value="{{ old('phone', $user->phone) }}" class="input-clean" placeholder="+970566700000">
                     <p data-error-for="phone" class="hidden mt-1 text-xs text-rose-500"></p>
                 </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                        رقم الهوية
+                        @if (! $user->national_id)
+                            <span class="text-rose-500">*</span>
+                        @endif
+                    </label>
+                    @if ($user->national_id)
+                        <input dir="ltr" value="{{ $user->national_id }}" class="input-clean font-mono" readonly>
+                        <p class="mt-1 text-[11px] text-slate-500">للتعديل، تواصل مع الإدارة.</p>
+                    @else
+                        <input name="national_id" dir="ltr" inputmode="numeric" maxlength="9" pattern="\d{9}"
+                               value="{{ old('national_id') }}" class="input-clean font-mono" placeholder="9 أرقام">
+                        <p class="mt-1 text-[11px] text-amber-600">⚠ يجب إضافة رقم الهوية لربط حسابك بالأنظمة.</p>
+                        <p data-error-for="national_id" class="hidden mt-1 text-xs text-rose-500"></p>
+                    @endif
+                </div>
             </div>
         </div>
 

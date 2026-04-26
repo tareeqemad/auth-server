@@ -4,11 +4,13 @@ import toastr from 'toastr';
 import 'toastr/build/toastr.css';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.css';
+import Chart from 'chart.js/auto';
 
 window.axios = axios;
 window.$ = window.jQuery = $;
 window.toastr = toastr;
 window.Swal = Swal;
+window.Chart = Chart;
 
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 

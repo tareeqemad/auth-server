@@ -150,9 +150,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('users/{user}/reset-password', [AdminUsersController::class, 'resetPassword'])->name('users.reset_password');
     Route::post('users/{user}/unlock', [AdminUsersController::class, 'unlock'])->name('users.unlock');
     Route::post('users/{user}/lock', [AdminUsersController::class, 'lock'])->name('users.lock');
+    Route::get('users/export', [AdminUsersController::class, 'export'])->name('users.export');
     Route::resource('users', AdminUsersController::class);
 
     Route::get('audit-logs', [AuditLogController::class, 'index'])->name('audit_logs.index');
+    Route::get('audit-logs/export', [AuditLogController::class, 'export'])->name('audit_logs.export');
 
     Route::get('sessions', [AdminSessionController::class, 'index'])->name('sessions.index');
     Route::post('sessions/{session}/revoke', [AdminSessionController::class, 'revoke'])->name('sessions.revoke');

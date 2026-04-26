@@ -38,9 +38,34 @@ class AppServiceProvider extends ServiceProvider
 
     private function shareBrandSettings(): void
     {
+        View::composer('*', function ($view) {
+            if ($view->offsetExists('brand')) {
+                return;
+            }
+
+            $view->with('brand', $this->buildBrandData());
+        });
+    }
+
+    private function buildBrandData(): array
+    {
+        $defaults = [
+            'company_ar' => 'شركة توزيع كهرباء غزة',
+            'company_en' => 'GEDCO',
+            'system_ar' => 'النظام الموحّد',
+            'system_en' => 'Unified System',
+            'tagline' => '',
+            'logo' => null,
+            'primary_color' => '#0f4c81',
+            'accent_color' => '#F97316',
+            'support_email' => '',
+            'support_phone' => '',
+            'applications' => [],
+        ];
+
         try {
             if (! Schema::hasTable('settings')) {
-                return;
+                return $defaults;
             }
 
             $applications = Schema::hasTable('oauth_clients') && Schema::hasColumn('oauth_clients', 'color')
@@ -57,21 +82,21 @@ class AppServiceProvider extends ServiceProvider
                     ->toArray()
                 : [];
 
-            View::share('brand', [
-                'company_ar' => Setting::get('company_name_ar', 'شركة توزيع كهرباء غزة'),
-                'company_en' => Setting::get('company_name_en', 'GEDCO'),
-                'system_ar' => Setting::get('system_name_ar', 'النظام الموحّد'),
-                'system_en' => Setting::get('system_name_en', 'Unified System'),
-                'tagline' => Setting::get('system_tagline', ''),
+            return [
+                'company_ar' => Setting::get('company_name_ar', $defaults['company_ar']),
+                'company_en' => Setting::get('company_name_en', $defaults['company_en']),
+                'system_ar' => Setting::get('system_name_ar', $defaults['system_ar']),
+                'system_en' => Setting::get('system_name_en', $defaults['system_en']),
+                'tagline' => Setting::get('system_tagline', $defaults['tagline']),
                 'logo' => Setting::get('logo_url'),
-                'primary_color' => Setting::get('primary_color', '#0f4c81'),
-                'accent_color' => Setting::get('accent_color', '#F97316'),
-                'support_email' => Setting::get('support_email', ''),
-                'support_phone' => Setting::get('support_phone', ''),
+                'primary_color' => Setting::get('primary_color', $defaults['primary_color']),
+                'accent_color' => Setting::get('accent_color', $defaults['accent_color']),
+                'support_email' => Setting::get('support_email', $defaults['support_email']),
+                'support_phone' => Setting::get('support_phone', $defaults['support_phone']),
                 'applications' => $applications,
-            ]);
+            ];
         } catch (\Throwable) {
-            // Settings table or DB not ready — ignore during migration/install.
+            return $defaults;
         }
     }
 }

@@ -10,6 +10,7 @@ return [
         'profile' => 'Access your basic profile information',
         'email' => 'Access your email address',
         'phone' => 'Access your phone number',
+        'national_id' => 'Access your Palestinian national ID (used to match you with your record in each client system)',
     ],
 
     'claims_supported' => [
@@ -17,6 +18,7 @@ return [
         'email', 'email_verified',
         'name', 'given_name', 'family_name',
         'phone_number', 'phone_number_verified',
+        'national_id',
     ],
 
     'keys' => [

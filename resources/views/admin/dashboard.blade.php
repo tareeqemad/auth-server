@@ -70,6 +70,34 @@
         @endforeach
     </div>
 
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+        <div class="card-glass rounded-2xl p-5 lg:col-span-2">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="font-semibold text-slate-900 text-sm">محاولات الدخول (آخر 30 يوم)</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">ناجحة مقابل فاشلة</p>
+                </div>
+                <div class="flex items-center gap-3 text-[11px]">
+                    <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> ناجحة</span>
+                    <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> فاشلة</span>
+                </div>
+            </div>
+            <div style="height: 240px; position: relative;">
+                <canvas id="chart-logins"></canvas>
+            </div>
+        </div>
+
+        <div class="card-glass rounded-2xl p-5">
+            <div class="mb-4">
+                <h3 class="font-semibold text-slate-900 text-sm">الأنظمة الأكثر استخداماً</h3>
+                <p class="text-xs text-slate-500 mt-0.5">عدد tokens مُصدرة (آخر 30 يوم)</p>
+            </div>
+            <div style="height: 240px; position: relative;">
+                <canvas id="chart-systems"></canvas>
+            </div>
+        </div>
+    </div>
+
     <div class="card-glass rounded-2xl overflow-hidden">
         <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
             <div>
@@ -117,4 +145,61 @@
             </div>
         @endif
     </div>
+
+    @php $chartData = ['logins' => $charts['logins_30d'], 'systems' => $charts['top_systems']]; @endphp
+    <script id="dashboard-charts-data" type="application/json">@json($chartData, JSON_UNESCAPED_UNICODE)</script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof Chart === 'undefined') return;
+
+            const data = JSON.parse(document.getElementById('dashboard-charts-data').textContent);
+
+            Chart.defaults.font.family = "'Tajawal', system-ui, sans-serif";
+            Chart.defaults.font.size = 11;
+            Chart.defaults.color = '#64748b';
+
+            const loginsCanvas = document.getElementById('chart-logins');
+            if (loginsCanvas && data.logins.labels.length) {
+                new Chart(loginsCanvas, {
+                    type: 'line',
+                    data: {
+                        labels: data.logins.labels.map(d => d.slice(5)),
+                        datasets: [
+                            { label: 'ناجحة', data: data.logins.success, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.12)', tension: 0.35, fill: true, pointRadius: 2, pointHoverRadius: 5, borderWidth: 2 },
+                            { label: 'فاشلة', data: data.logins.failed, borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,.1)', tension: 0.35, fill: true, pointRadius: 2, pointHoverRadius: 5, borderWidth: 2 },
+                        ],
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false }, tooltip: { rtl: true, backgroundColor: '#0f172a', padding: 10, cornerRadius: 8 } },
+                        scales: {
+                            x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkipPadding: 15 } },
+                            y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#e2e8f0', drawBorder: false } },
+                        },
+                    },
+                });
+            }
+
+            const systemsCanvas = document.getElementById('chart-systems');
+            if (systemsCanvas && data.systems.labels.length) {
+                new Chart(systemsCanvas, {
+                    type: 'doughnut',
+                    data: {
+                        labels: data.systems.labels,
+                        datasets: [{ data: data.systems.data, backgroundColor: data.systems.colors, borderColor: '#fff', borderWidth: 2 }],
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false, cutout: '60%',
+                        plugins: {
+                            legend: { position: 'bottom', rtl: true, labels: { padding: 12, boxWidth: 10, font: { size: 11 } } },
+                            tooltip: { rtl: true, backgroundColor: '#0f172a', padding: 10, cornerRadius: 8 },
+                        },
+                    },
+                });
+            } else if (systemsCanvas) {
+                systemsCanvas.parentElement.innerHTML = '<div class="flex items-center justify-center h-full text-xs text-slate-500">لا توجد بيانات بعد</div>';
+            }
+        });
+    </script>
 @endsection

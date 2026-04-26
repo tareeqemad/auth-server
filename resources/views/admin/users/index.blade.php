@@ -7,6 +7,10 @@
 @endsection
 
 @section('breadcrumb_actions')
+    <a href="{{ route('admin.users.export', request()->query()) }}" class="btn-ghost text-xs sm:text-sm font-medium px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        <span class="hidden sm:inline">Export CSV</span>
+    </a>
     <a href="{{ route('admin.users.create') }}" class="btn-accent text-xs sm:text-sm font-semibold px-3 sm:px-4 py-1.5 rounded-lg inline-flex items-center gap-1.5">
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
         <span class="hidden sm:inline">مستخدم جديد</span>

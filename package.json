@@ -17,6 +17,7 @@
     "dependencies": {
         "@fontsource/amiri": "^5.2.8",
         "@fontsource/tajawal": "^5.2.7",
+        "chart.js": "^4.5.1",
         "jquery": "^4.0.0",
         "sweetalert2": "^11.26.24",
         "toastr": "^2.1.4"

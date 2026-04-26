@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Rules\PalestinianNationalId;
 use App\Services\AccountLockoutService;
 use App\Services\PasswordHistoryService;
 use Illuminate\Contracts\View\View;
@@ -14,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class UserController extends Controller
 {
@@ -85,6 +87,7 @@ class UserController extends Controller
             'full_name' => $data['full_name'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
+            'national_id' => $data['national_id'] ?? null,
             'is_active' => (bool) ($data['is_active'] ?? true),
             'password' => Hash::make($data['password']),
             'email_verified_at' => now(),
@@ -138,6 +141,7 @@ class UserController extends Controller
             'full_name' => $data['full_name'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
+            'national_id' => $data['national_id'] ?? null,
             'is_active' => (bool) ($data['is_active'] ?? false),
         ];
 
@@ -239,6 +243,68 @@ class UserController extends Controller
         ]);
     }
 
+    public function export(Request $request): StreamedResponse
+    {
+        $filename = 'users-'.now()->format('Y-m-d-His').'.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Cache-Control' => 'no-store, no-cache',
+        ];
+
+        return response()->streamDownload(function () use ($request) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF");
+
+            fputcsv($out, [
+                'id', 'email', 'full_name', 'phone', 'national_id', 'employee_number',
+                'source', 'needs_id_linking', 'job_title', 'department', 'governorate',
+                'is_active', 'locked_until', 'failed_login_attempts', 'sms_2fa_enabled',
+                'last_login_at', 'last_login_ip', 'created_at', 'systems_count',
+            ]);
+
+            $query = User::query()->withCount('systemLinks');
+
+            if ($search = $request->query('q')) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('full_name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%")
+                        ->orWhere('national_id', 'like', "%{$search}%");
+                });
+            }
+
+            if ($status = $request->query('status')) {
+                match ($status) {
+                    'active' => $query->where('is_active', true),
+                    'inactive' => $query->where('is_active', false),
+                    'locked' => $query->whereNotNull('locked_until')->where('locked_until', '>', now()),
+                    default => null,
+                };
+            }
+
+            $query->orderBy('created_at')->chunk(500, function ($users) use ($out) {
+                foreach ($users as $u) {
+                    fputcsv($out, [
+                        $u->id, $u->email, $u->full_name, $u->phone, $u->national_id,
+                        $u->employee_number, $u->source, $u->needs_id_linking ? '1' : '0',
+                        $u->job_title, $u->department, $u->governorate,
+                        $u->is_active ? '1' : '0',
+                        $u->locked_until?->toIso8601String() ?? '',
+                        $u->failed_login_attempts, $u->sms_2fa_enabled ? '1' : '0',
+                        $u->last_login_at?->toIso8601String() ?? '',
+                        $u->last_login_ip,
+                        $u->created_at?->toIso8601String() ?? '',
+                        $u->system_links_count,
+                    ]);
+                }
+            });
+
+            fclose($out);
+        }, $filename, $headers);
+    }
+
     public function resetPassword(Request $request, User $user): JsonResponse
     {
         $newPassword = Str::password(14, letters: true, numbers: true, symbols: false);
@@ -270,12 +336,18 @@ class UserController extends Controller
             'full_name' => ['required', 'string', 'min:2', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($ignoreId)->whereNull('deleted_at')],
             'phone' => ['nullable', 'string', 'max:32'],
+            'national_id' => [
+                'nullable', 'string', 'size:9',
+                Rule::unique('users', 'national_id')->ignore($ignoreId)->whereNull('deleted_at'),
+                new PalestinianNationalId(),
+            ],
             'is_active' => ['nullable', 'boolean'],
             'password' => [$ignoreId ? 'nullable' : 'required', 'nullable', 'string', 'min:8', 'confirmed'],
         ];
 
         return $request->validate($rules, [], [
             'full_name' => 'الاسم الكامل',
+            'national_id' => 'رقم الهوية',
             'email' => 'البريد الإلكتروني',
             'phone' => 'الهاتف',
             'is_active' => 'الحالة',

@@ -112,6 +112,11 @@ class User extends Authenticatable
         return $this->locked_until !== null && $this->locked_until->isFuture();
     }
 
+    public function maskedNationalId(): string
+    {
+        return \App\Rules\PalestinianNationalId::mask($this->national_id);
+    }
+
     public function lockReasonLabel(): ?string
     {
         if (! $this->isLocked()) {

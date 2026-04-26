@@ -40,6 +40,15 @@
                 </div>
 
                 <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">رقم الهوية</label>
+                    <input name="national_id" dir="ltr" maxlength="9" inputmode="numeric" pattern="\d{9}"
+                           value="{{ old('national_id', $user->national_id) }}"
+                           class="input-glass w-full px-3 py-2.5 rounded-lg text-sm font-mono" placeholder="9 أرقام">
+                    <p class="mt-1 text-[11px] text-slate-500">مفتاح الربط مع الأنظمة الخمسة (id_number في كل نظام)</p>
+                    <p data-error-for="national_id" class="hidden mt-1 text-xs text-rose-500"></p>
+                </div>
+
+                <div>
                     <label class="block text-xs font-semibold text-slate-700 mb-1.5">الحالة</label>
                     <label class="flex items-center gap-2.5 py-2.5">
                         <input type="checkbox" name="is_active" value="1"

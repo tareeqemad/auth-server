@@ -6,6 +6,13 @@
     <span class="bc-current">سجل الأحداث</span>
 @endsection
 
+@section('breadcrumb_actions')
+    <a href="{{ route('admin.audit_logs.export', request()->query()) }}" class="btn-ghost text-xs sm:text-sm font-medium px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        <span class="hidden sm:inline">Export CSV</span>
+    </a>
+@endsection
+
 @section('content')
     <div class="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
         <div class="card-glass rounded-2xl p-5">

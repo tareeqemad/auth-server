@@ -28,6 +28,10 @@ class ClaimsService
             $claims['phone_number_verified'] = false;
         }
 
+        if (in_array('national_id', $scopes, true) && $user->national_id) {
+            $claims['national_id'] = $user->national_id;
+        }
+
         return $claims;
     }
 }

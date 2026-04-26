@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\SsoSession;
+use App\Rules\PalestinianNationalId;
 use App\Services\PasswordHistoryService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -27,24 +28,42 @@ class ProfileController extends Controller
     {
         $user = Auth::user();
 
-        $data = $request->validate([
+        $rules = [
             'full_name' => ['required', 'string', 'min:2', 'max:255'],
             'phone' => ['nullable', 'string', 'max:32'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)->whereNull('deleted_at')],
-        ], [], [
+        ];
+
+        // national_id is editable by the user only if currently empty
+        if (empty($user->national_id)) {
+            $rules['national_id'] = [
+                'nullable', 'string', 'size:9',
+                Rule::unique('users', 'national_id')->ignore($user->id)->whereNull('deleted_at'),
+                new PalestinianNationalId(),
+            ];
+        }
+
+        $data = $request->validate($rules, [], [
             'full_name' => 'الاسم الكامل',
             'phone' => 'الهاتف',
             'email' => 'البريد الإلكتروني',
+            'national_id' => 'رقم الهوية',
         ]);
 
         $emailChanged = $user->email !== $data['email'];
 
-        $user->update([
+        $updates = [
             'full_name' => $data['full_name'],
             'phone' => $data['phone'] ?? null,
             'email' => $data['email'],
             'email_verified_at' => $emailChanged ? null : $user->email_verified_at,
-        ]);
+        ];
+
+        if (empty($user->national_id) && ! empty($data['national_id'])) {
+            $updates['national_id'] = $data['national_id'];
+        }
+
+        $user->update($updates);
 
         if ($request->wantsJson()) {
             return response()->json([
